@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/ICPC.dir/main.cpp.o  -o ICPC 
