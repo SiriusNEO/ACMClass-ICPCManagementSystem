@@ -1,6 +1,6 @@
 #include <iostream>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <set>
 #include <algorithm>
 #include <fstream>
@@ -8,14 +8,14 @@
 
 using namespace std;
 
-const int N = 30002;
-const int MaxM = 30;
+const int N = 10002;
+const int MaxM = 27;
 
 const string stainfo[]={"Accepted", "Wrong_Answer", "Runtime_Error", "Time_Limit_Exceed", "ALL"};
 
 int duration, pbCnt, teamCnt;
 bool startFlag = false, fzFlag = false;
-map <string, int> hashTable;
+unordered_map <string, int> hashTable;
 
 enum typeSta {AC, WA, RE, TLE, ALL};
 
@@ -30,7 +30,7 @@ struct Problem {
 };
 
 struct Team {
-    int rk, accnt, plty;
+    int rk, accnt, plty, fire;
     string name;
     Problem pb[MaxM], fzpb[MaxM];
     Submission last[5], llast, plast[MaxM][5], pllast[MaxM];
@@ -123,6 +123,7 @@ void Freeze() {
     }
     fzFlag = true;
     for (int i = 1; i <= teamCnt; ++i) {
+        teamPool[i]->fire = 0;
         for (int j = 0; j < pbCnt; ++j)
             teamPool[i]->fzpb[j] = teamPool[i]->pb[j];
     }
@@ -176,24 +177,22 @@ void Scroll() {
     Print();
     for (auto i = rkTable.end() - 1; i >= rkTable.begin(); ) {
         Team* nowTeam = teamPool[i->pos];
-        bool fireFlag = false;
-        for (int j = 0; j < pbCnt; ++j) {
-            if (nowTeam->pb[j].cnt != nowTeam->fzpb[j].cnt && !nowTeam->pb[j].firstAC) {
-                fireFlag = true;
-                nowTeam->pb[j] = nowTeam->fzpb[j];
-                if (nowTeam->pb[j].firstAC) {
+        if (nowTeam->fire >= pbCnt) --i;
+        else {
+            if (nowTeam->pb[nowTeam->fire].cnt != nowTeam->fzpb[nowTeam->fire].cnt && !nowTeam->pb[nowTeam->fire].firstAC) {
+                nowTeam->pb[nowTeam->fire] = nowTeam->fzpb[nowTeam->fire];
+                if (nowTeam->pb[nowTeam->fire].firstAC) {
                     nowTeam->accnt++;
-                    nowTeam->plty += 20*nowTeam->pb[j].fail+nowTeam->pb[j].firstAC;
+                    nowTeam->plty += 20*nowTeam->pb[nowTeam->fire].fail+nowTeam->pb[nowTeam->fire].firstAC;
                 }
-                auto ii = upper_bound(rkTable.begin(), i, *i);
-                if(ii != i) {
-                    cout << nowTeam->name << ' ' << teamPool[ii->pos]->name << ' ' << nowTeam->accnt << ' ' << nowTeam->plty << '\n';
-                    for (auto iii = i; iii > ii; --iii) swap(*iii, *(iii-1));
+                auto tar = upper_bound(rkTable.begin(), i, *i);
+                if(tar != i) {
+                    cout << nowTeam->name << ' ' << teamPool[tar->pos]->name << ' ' << nowTeam->accnt << ' ' << nowTeam->plty << '\n';
+                    for (auto j = i; j > tar; --j) swap(*j, *(j-1));
                 }
-                break;
             }
+            nowTeam->fire++;
         }
-        if (!fireFlag) --i;
     }
     Print();
     teamTable.clear();
@@ -244,7 +243,11 @@ int main() {
     //ofstream log("log/log.txt");
     
     //log << "TIME TEST\n";
-    string cmd, argv[233];
+    //clock_t sta = clock();
+    std::ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+    cout.tie(nullptr);
+    string cmd, argv[23];
     int argc;
     while (getline(cin, cmd)) {
         argc = 0;
@@ -296,6 +299,7 @@ int main() {
             startFlag = false;
             cout << "[Info]Competition ends.\n";
             //for (int i = 1; i <= teamCnt; ++i) delete teamPool[i];
+            //log << "Total Time Cost: " << 1.0 * (clock() - sta) / CLOCKS_PER_SEC << '\n';
             return 0;
         }
     }
