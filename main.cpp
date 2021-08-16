@@ -1,9 +1,10 @@
 #include <iostream>
 #include <vector>
-#include <unordered_map>
 #include <map>
 #include <set>
 #include <algorithm>
+#include <fstream>
+#include <ctime>
 
 using namespace std;
 
@@ -14,7 +15,7 @@ const string stainfo[]={"Accepted", "Wrong_Answer", "Runtime_Error", "Time_Limit
 
 int duration, pbCnt, teamCnt;
 bool startFlag = false, fzFlag = false;
-unordered_map <string, int> hashTable;
+map <string, int> hashTable;
 
 enum typeSta {AC, WA, RE, TLE, ALL};
 
@@ -60,7 +61,7 @@ struct Data {
 set <Data> teamTable;
 vector <Data> rkTable;
 
-void AddTeam(const char* str) {
+void AddTeam(const string& str) {
     if (!startFlag) {
         if (!hashTable[str]) {
             teamPool[++teamCnt] = new Team();
@@ -95,6 +96,7 @@ void Start(int duration1, int pbCnt1) {
 
 void Submit(char pbName, const string& teamName, typeSta sta, int time) {
     Team* nowTeam = teamPool[hashTable[teamName]];
+    if (nowTeam == nullptr) return;
     nowTeam->pllast[pbName-'A'] = nowTeam->llast = nowTeam->plast[pbName-'A'][sta] = nowTeam->last[sta] = (Submission){pbName, sta, time};
     if (!fzFlag) {
         teamTable.erase((Data){hashTable[teamName]});
@@ -172,30 +174,26 @@ void Scroll() {
     fzFlag = false;
     Flush();
     Print();
-    while (true) {
+    for (auto i = rkTable.end() - 1; i >= rkTable.begin(); ) {
+        Team* nowTeam = teamPool[i->pos];
         bool fireFlag = false;
-        auto i = rkTable.end()-1;
-        for (; i >= rkTable.begin(); --i) {
-            Team* nowTeam = teamPool[i->pos];
-            for (int j = 0; j < pbCnt; ++j) {
-                if (nowTeam->pb[j].cnt != nowTeam->fzpb[j].cnt && !nowTeam->pb[j].firstAC) {
-                    fireFlag = true;
-                    nowTeam->pb[j] = nowTeam->fzpb[j];
-                    if (nowTeam->pb[j].firstAC) {
-                        nowTeam->accnt++;
-                        nowTeam->plty += 20*nowTeam->pb[j].fail+nowTeam->pb[j].firstAC;
-                    }
-                    auto ii = upper_bound(rkTable.begin(), i, *i);
-                    if(ii != i) {
-                        cout << nowTeam->name << ' ' << teamPool[ii->pos]->name << ' ' << nowTeam->accnt << ' ' << nowTeam->plty << '\n';
-                        for (auto iii = i; iii > ii; --iii) swap(*iii, *(iii-1));
-                    }
-                    break;
+        for (int j = 0; j < pbCnt; ++j) {
+            if (nowTeam->pb[j].cnt != nowTeam->fzpb[j].cnt && !nowTeam->pb[j].firstAC) {
+                fireFlag = true;
+                nowTeam->pb[j] = nowTeam->fzpb[j];
+                if (nowTeam->pb[j].firstAC) {
+                    nowTeam->accnt++;
+                    nowTeam->plty += 20*nowTeam->pb[j].fail+nowTeam->pb[j].firstAC;
                 }
+                auto ii = upper_bound(rkTable.begin(), i, *i);
+                if(ii != i) {
+                    cout << nowTeam->name << ' ' << teamPool[ii->pos]->name << ' ' << nowTeam->accnt << ' ' << nowTeam->plty << '\n';
+                    for (auto iii = i; iii > ii; --iii) swap(*iii, *(iii-1));
+                }
+                break;
             }
-            if (fireFlag) break;
         }
-        if (!fireFlag) break;
+        if (!fireFlag) --i;
     }
     Print();
     teamTable.clear();
@@ -236,14 +234,22 @@ inline int StringToInt(const std::string& str) {
     return ret;
 }
 
+bool validator(char ch) {
+    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch == '_');
+}
+
 int main() {
+    //freopen("data/bigger.in", "r", stdin);
+    //freopen("myout.out", "w", stdout);
+    //ofstream log("log/log.txt");
+    
+    //log << "TIME TEST\n";
     string cmd, argv[233];
     int argc;
     while (getline(cin, cmd)) {
         argc = 0;
+        while (!validator(cmd[cmd.size()-1])) cmd.pop_back();
         int ii = 0, jj, len = cmd.size();
-        //while ((cmd[ii] == ' ' || cmd[ii] == '\t') && ii < cmd.size())  ++ii;
-        //while (cmd[len-1] == ' ' || cmd[len-1] == '\t') --len;
         for (jj = ii; ii < len; ++ii) {
             if (cmd[ii] == ' ') {
                 argv[argc++] = cmd.substr(jj, ii-jj);
@@ -251,7 +257,7 @@ int main() {
             }
         }
         if (jj < len) argv[argc++] = cmd.substr(jj, len-jj);
-        if (argc == 2 && argv[0] == "ADDTEAM") AddTeam(argv[1].c_str());
+        if (argc == 2 && argv[0] == "ADDTEAM") AddTeam(argv[1]);
         else if (argc == 5 && argv[0] == "START") Start(StringToInt(argv[2]), StringToInt(argv[4]));
         else if (argc == 8 && argv[0] == "SUBMIT") {
             if (argv[5] == stainfo[0]) Submit(argv[1][0], argv[3], AC, StringToInt(argv[7]));
@@ -260,15 +266,25 @@ int main() {
             else if (argv[5] == stainfo[3]) Submit(argv[1][0], argv[3], TLE, StringToInt(argv[7]));
         }
         else if (argc == 1 && argv[0] == "FLUSH") {
+            //clock_t sta = clock();
             Flush();
             cout << "[Info]Flush scoreboard.\n";
+            //log << "Flush Time Cost: " << 1.0 * (clock() - sta) / CLOCKS_PER_SEC << '\n';
         }
-        else if (argc == 1 && argv[0] == "FREEZE") Freeze();
-        else if (argc == 1 && argv[0] == "SCROLL") Scroll();
+        else if (argc == 1 && argv[0] == "FREEZE") {
+            //clock_t sta = clock();
+            Freeze();
+            //log << "Freeze Time Cost: " << 1.0 * (clock() - sta) / CLOCKS_PER_SEC << '\n';
+        }
+        else if (argc == 1 && argv[0] == "SCROLL") {
+            //clock_t sta = clock();
+            Scroll();
+            //log << "SCROLL Time Cost: " << 1.0 * (clock() - sta) / CLOCKS_PER_SEC << '\n';
+        }
         else if (argc == 2 && argv[0] == "QUERY_RANKING") QueryRank(argv[1]);
         else if (argc == 6 && argv[0] == "QUERY_SUBMISSION") {
             if (argv[3].size() < 8 || argv[5].size() < 7) continue;
-            if(argv[3].substr(8,argv[3].size()-8) == "ALL") argv[3]="PROBLEM=$";
+            if(argv[3] == "PROBLEM=ALL") argv[3]="PROBLEM=$";
             argv[5] = argv[5].substr(7, argv[5].size()-7);
             if (argv[5] == stainfo[0]) QuerySubmit(argv[1], argv[3][8], AC);
             else if (argv[5] == stainfo[1]) QuerySubmit(argv[1], argv[3][8], WA);
@@ -283,5 +299,6 @@ int main() {
             return 0;
         }
     }
+
     return 0;
 }
